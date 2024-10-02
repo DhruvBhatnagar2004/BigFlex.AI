@@ -1,80 +1,89 @@
-from PIL import Image, ImageDraw, ImageFont
-import textwrap
+import gradio as gr
+from promo_generator import generate_promo_images
+from background_generator import generate_background
 
-def create_promo_images(product_image_path, deal_text, output_path_prefix):
-    # Create a white background
-    width, height = 1080, 1080
-    
-    # Load the product image
-    product_img = Image.open(product_image_path).convert('RGBA')
-    
-    # Resize product image
-    product_img = product_img.resize((600, 700), Image.LANCZOS)
-    
-    # Prepare fonts
-    try:
-        font_large = ImageFont.truetype("arialbd.ttf", 80)
-        font_small = ImageFont.truetype("arialbd.ttf", 60)
-    except IOError:
-        font_large = ImageFont.truetype("arial.ttf", 80)
-        font_small = ImageFont.truetype("arial.ttf", 60)
+def generate_promos(image, deal_prompt):
+    deal_text, center_image, left_image, right_image = generate_promo_images(image, deal_prompt)
+    return deal_text, center_image, left_image, right_image
 
-    # Create three different layouts
-    layouts = ['center', 'left', 'right']
-    
-    for layout in layouts:
-        image = Image.new('RGB', (width, height), color=(255, 255, 255))
-        draw = ImageDraw.Draw(image)
-        
-        # Set image and text positions based on layout
-        if layout == 'center':
-            img_x = (width - product_img.width) // 2
-            img_y = height - product_img.height - 50
-            text_y = 50
-        elif layout == 'left':
-            img_x = 50
-            img_y = (height - product_img.height) // 2
-            text_y = 50
-        else:  # right
-            img_x = width - product_img.width - 50
-            img_y = (height - product_img.height) // 2
-            text_y = 50
-        
-        # Paste product image
-        image.paste(product_img, (img_x, img_y), product_img)
-        
-        # Add discount text
-        y_text = text_y
-        # discount_lines = textwrap.wrap(discount_text, width=15)
-        # for line in discount_lines:
-        #     bbox = draw.textbbox((0, 0), line, font=font_large)
-        #     text_width = bbox[2] - bbox[0]
-        #     if layout == 'left':
-        #         x_text = width - text_width - 50
-        #     elif layout == 'right':
-        #         x_text = 50
-        #     else:  # center
-        #         x_text = (width - text_width) // 2
-        #     draw.text((x_text, y_text), line, font=font_large, fill=(0, 0, 0))
-        #     y_text += bbox[3] - bbox[1]
-        
-        # Add deal text
-        deal_lines = textwrap.wrap(deal_text, width=20)
-        for line in deal_lines:
-            bbox = draw.textbbox((0, 0), line, font=font_small)
-            text_width = bbox[2] - bbox[0]
-            if layout == 'left':
-                x_text = width - text_width - 50
-            elif layout == 'right':
-                x_text = 50
-            else:  # center
-                x_text = (width - text_width) // 2
-            draw.text((x_text, y_text), line, font=font_small, fill=(0, 0, 0))
-            y_text += bbox[3] - bbox[1]
-        
-        # Save the image
-        image.save(f"{output_path_prefix}_{layout}.jpg", quality=95)
+def generate_new_backgrounds(selected_image, bg_prompt, negative_prompt, num_outputs, num_inference_steps, seed, controlnet_conditioning_scale):
+    new_backgrounds = generate_background(
+        input_image=selected_image,
+        prompt=bg_prompt,
+        negative_prompt=negative_prompt,
+        num_outputs=num_outputs,
+        num_inference_steps=num_inference_steps,
+        seed=seed,
+        controlnet_conditioning_scale=controlnet_conditioning_scale
+    )
+    # Pad the output list to always have 4 elements
+    padded_backgrounds = new_backgrounds + [None] * (4 - len(new_backgrounds))
+    return padded_backgrounds
 
-# Example usage
-dealtext=input('enter the text')
-create_promo_images('product.png', dealtext, 'promo_image')
+# Define the Gradio interface
+with gr.Blocks() as demo:
+    gr.Markdown("# Promotional Image and Background Generator")
+    
+    with gr.Tab("Step 1: Generate Promo Images"):
+        with gr.Row():
+            input_image = gr.Image(type="pil", label="Upload Product Image")
+            deal_prompt = gr.Textbox(
+                label="Prompt for Deal Text", 
+                lines=3, 
+                value="Create a short and eye-catching minimum 10 sentence and simple heading for a sale offer. The offer is Big Basket 53% off in Big Indian Grocery Sale. Give me only the heading with no other text, no ##, ** or any other sign in start and end of text"
+            )
+        generate_button = gr.Button("Generate Promo Images")
+        
+        with gr.Row():
+            deal_text_output = gr.Textbox(label="Generated Deal Text")
+        
+        with gr.Row():
+            center_image_output = gr.Image(type="pil", label="Center Layout")
+            left_image_output = gr.Image(type="pil", label="Left Layout")
+            right_image_output = gr.Image(type="pil", label="Right Layout")
+    
+    with gr.Tab("Step 2: Generate New Backgrounds"):
+        with gr.Row():
+            selected_image = gr.Image(type="pil", label="Selected Promo Image")
+            bg_prompt = gr.Textbox(label="Background Prompt", value="mountains and city")
+        
+        with gr.Row():
+            negative_prompt = gr.Textbox(label="Negative Prompt", value="3d, cgi, render, bad quality, normal quality")
+            num_outputs = gr.Slider(minimum=1, maximum=4, step=1, label="Number of Backgrounds", value=2)
+            num_inference_steps = gr.Slider(minimum=10, maximum=50, step=1, label="Number of Inference Steps", value=15)
+        
+        with gr.Row():
+            seed = gr.Number(label="Seed (optional)")
+            controlnet_conditioning_scale = gr.Slider(minimum=0.1, maximum=2.0, step=0.1, label="ControlNet Conditioning Scale", value=1.5)
+        
+        generate_bg_button = gr.Button("Generate New Backgrounds")
+        with gr.Row():
+            text = gr.Textbox(("Creating Background in CPU take too much time almost 8 min for 4 image. Use T4 GPU for Fast Processing /n Running First take time to load the model"))
+        
+        with gr.Row():
+            new_background_output1 = gr.Image(type="pil", label="Background 1")
+            new_background_output2 = gr.Image(type="pil", label="Background 2")
+            new_background_output3 = gr.Image(type="pil", label="Background 3")
+            new_background_output4 = gr.Image(type="pil", label="Background 4")
+
+    # Connect the components
+    generate_button.click(
+        generate_promos,
+        inputs=[input_image, deal_prompt],
+        outputs=[deal_text_output, center_image_output, left_image_output, right_image_output]
+    )
+
+    # Allow users to select one of the generated images for background generation
+    center_image_output.select(lambda x: x, outputs=selected_image)
+    left_image_output.select(lambda x: x, outputs=selected_image)
+    right_image_output.select(lambda x: x, outputs=selected_image)
+
+    generate_bg_button.click(
+        generate_new_backgrounds,
+        inputs=[selected_image, bg_prompt, negative_prompt, num_outputs, num_inference_steps, seed, controlnet_conditioning_scale],
+        outputs=[new_background_output1, new_background_output2, new_background_output3, new_background_output4]
+    )
+
+# Launch the Gradio app
+if __name__ == "__main__":
+    demo.launch(share=True)
