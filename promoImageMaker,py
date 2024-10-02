@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import textwrap
 import gradio as gr
 
-genai.configure(api_key="AIzaSyC_1awCGgFK7yTenEQKhGfu8FXY9kUCLwc")
+genai.configure(api_key="api_key_here")
 
 def upload_to_gemini(image_path, mime_type=None):
     """Uploads the given file to Gemini."""
