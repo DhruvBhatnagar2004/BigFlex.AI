@@ -108,15 +108,10 @@ And produces:
 
 ### Usage
 
-1. Run the background generation script:
+1. Run the app script:
    ```bash
-   python BgGeneratorWithCPU.py
+   python app.py
    ```
 
-2. Run the promotional image generator:
-   ```bash
-   python promoImageGenerator.py
-   ```
-
-3. Access the Gradio interface by opening the URL provided in the console output.
+2. Access the Gradio interface by opening the URL provided in the console output.
 
